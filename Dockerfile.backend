@@ -1,0 +1,40 @@
+# Dockerfile for TradeX C++ Core Backend Engine
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    clang \
+    libmysqlclient-dev \
+    libssl-dev \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY backend/include ./include
+COPY backend/src ./src
+COPY backend/CMakeLists.txt .
+
+RUN clang++ -std=c++17 -O2 \
+    -I./include \
+    -I/usr/include/mysql \
+    -L/usr/lib/x86_64-linux-gnu \
+    -lmysqlclient \
+    -lpthread \
+    ./src/main.cpp -o tradex_server
+
+FROM ubuntu:22.04 AS runner
+
+RUN apt-get update && apt-get install -y \
+    libmysqlclient21 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /app/tradex_server /app/tradex_server
+
+EXPOSE 8080
+
+CMD ["/app/tradex_server"]

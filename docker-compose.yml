@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  tradex-mysql:
+    image: mysql:8.0
+    container_name: tradex-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASS:-Shivam@20}
+      MYSQL_DATABASE: ${DB_NAME:-tradex}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/indexes.sql:/docker-entrypoint-initdb.d/02-indexes.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  tradex-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: tradex-backend
+    restart: always
+    depends_on:
+      tradex-mysql:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      DB_HOST: tradex-mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASS: ${DB_PASS:-Shivam@20}
+      DB_NAME: ${DB_NAME:-tradex}
+      JWT_SECRET: ${JWT_SECRET:-tradex_super_secret_jwt_key_2026}
+    ports:
+      - "8080:8080"
+
+  tradex-frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+    container_name: tradex-frontend
+    restart: always
+    depends_on:
+      - tradex-backend
+    ports:
+      - "5173:80"
+
+volumes:
+  mysql-data:
